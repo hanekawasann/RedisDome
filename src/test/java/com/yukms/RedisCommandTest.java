@@ -16,7 +16,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 /**
  * @author yukms 2019/1/8.
  */
-public class RedisTest extends BaseServiceTest {
+public class RedisCommandTest extends BaseServiceTest {
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 

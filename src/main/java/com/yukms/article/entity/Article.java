@@ -1,4 +1,4 @@
-package com.yukms.article;
+package com.yukms.article.entity;
 
 import java.util.ArrayList;
 import java.util.List;
