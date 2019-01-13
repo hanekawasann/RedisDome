@@ -1,8 +1,9 @@
-package com.yukms;
+package com.yukms.redis;
 
 import java.io.Serializable;
 import java.util.Objects;
 
+import com.yukms.BaseRedisServiceTest;
 import org.junit.Assert;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,7 +13,7 @@ import org.springframework.data.redis.core.ValueOperations;
 /**
  * @author yukms 2019/1/10.
  */
-public class RedisSaveObjectTest extends BaseServiceTest {
+public class SaveObjectTest extends BaseRedisServiceTest {
     @Autowired
     private RedisTemplate<Object, Object> redisTemplate;
 

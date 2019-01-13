@@ -1,4 +1,4 @@
-package com.yukms;
+package com.yukms.redis;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import com.yukms.BaseRedisServiceTest;
 import org.apache.commons.lang.StringUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -17,7 +18,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 /**
  * @author yukms 2019/1/8.
  */
-public class RedisCommandTest extends BaseServiceTest {
+public class CommandOfZsetTest extends BaseRedisServiceTest {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 

@@ -13,12 +13,12 @@ import org.springframework.test.context.junit4.SpringRunner;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest
-public class BaseServiceTest {
+public class BaseRedisServiceTest {
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 
     /**
-     * 没运行一个新的单元测试方法，都清理redis
+     * 每运行一个新的单元测试方法，都清理redis数据
      */
     @Before
     public void init() {

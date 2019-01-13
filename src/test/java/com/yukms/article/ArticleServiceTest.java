@@ -8,13 +8,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import com.yukms.BaseServiceTest;
+import com.yukms.BaseRedisServiceTest;
 import com.yukms.article.entity.Article;
 import org.junit.Assert;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-public class ArticleServiceTest extends BaseServiceTest {
+public class ArticleServiceTest extends BaseRedisServiceTest {
     @Autowired
     private ArticleService articleService;
 
