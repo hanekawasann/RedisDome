@@ -17,8 +17,15 @@ public class BaseServiceTest {
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 
+    /**
+     * 没运行一个新的单元测试方法，都清理redis
+     */
     @Before
     public void init() {
+        flushDb();
+    }
+
+    protected void flushDb() {
         redisTemplate.execute((RedisCallback<String>) connection -> {
             connection.flushDb();
             return "ok";

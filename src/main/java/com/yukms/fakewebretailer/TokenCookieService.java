@@ -1,11 +1,14 @@
 package com.yukms.fakewebretailer;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Optional;
 
 import com.yukms.common.util.SystemUtil;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.data.redis.connection.RedisZSetCommands;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
@@ -88,7 +91,52 @@ public class TokenCookieService {
             zSetOperations.add(VIEWED + token, itemId, timetamp);
             // 注意
             zSetOperations.removeRange(VIEWED + token, 0, -26);
+            /*
+             * 每个用户都有一个相应的记录用户浏览商品历史的有序集合，
+             * 尽管使用这些有序集合可以计算出用户最经常浏览的商品，
+             * 但进行这种计算却需要耗费大量的时间。
+             * <p/>
+             * 新代码记录了所有商品的浏览次数，并根据浏览次数对商品进行排序，
+             * 被浏览得最多的商品将被放到有序集合的索引0位置上，并且具有整个有序集合最少的分值。
+             * 随着时间流逝，商品的浏览次数会呈现两级分化的状态，一些商品的浏览次数会越来越多，
+             * 而另一些商品的浏览次数会越来越少。
+             */
+            // 代码有错误
+            // zSetOperations.incrementScore(VIEWED, itemId, -1);
+            zSetOperations.incrementScore(VIEWED, itemId, 1);
         }
+    }
+
+    /**
+     * 除了缓存最常浏览的商品之外，程序还需要发现那些变得越来越流行的新商品，并在合适的时候缓存它们。
+     * 为了让商品浏览次数排行榜能保持最新，我们需要定期修剪有序集合的长度并调整已有元素的分值，
+     * 从而使得新流行的商品也可以在排行榜里面占据一席之地。
+     * <p/>
+     * 每隔5分钟，程序就会删除所有排名20000名之后的商品，并将删除之后剩余的所有商品的浏览次数减半。
+     */
+    public void rescaleViewed() throws InterruptedException {
+        ZSetOperations<String, String> zSetOperations = stringRedisTemplate.opsForZSet();
+        for (; ; ) {
+            zSetOperations.removeRange(VIEWED, 0, -20001);
+            zSetOperations.intersectAndStore(VIEWED, Collections.emptyList(), VIEWED, RedisZSetCommands.Aggregate.SUM,
+                RedisZSetCommands.Weights.of(0.5d));
+            Thread.sleep(1000 * 60 * 5);
+        }
+    }
+
+    /**
+     * 根据商品浏览次数排名来判断是否需要缓存。
+     *
+     * @param itemId 商品ID
+     * @return true表示可以缓存，false表示不能缓存
+     */
+    public boolean canCache(String itemId) {
+        if (StringUtils.isEmpty(itemId)) {
+            return false;
+        }
+        Long rank = stringRedisTemplate.opsForZSet().rank(VIEWED, itemId);
+        // return rank != null && rank < 10000;
+        return rank != null && rank > 10000;
     }
 
     /**
@@ -128,10 +176,14 @@ public class TokenCookieService {
      * 也是用的令牌cookie吗？
      * </strong>
      */
-    public void cheanSessions() {
+    public void cheanSessions() throws InterruptedException {
         ZSetOperations<String, String> zSetOperations = stringRedisTemplate.opsForZSet();
-        Long size = zSetOperations.size(RECENT);
-        if (null != size && size > maxRecent) {
+        for (; ; ) {
+            Long size = zSetOperations.size(RECENT);
+            if (null == size || size <= maxRecent) {
+                Thread.sleep(1000L);
+                continue;
+            }
             long end = Math.min(size - maxRecent, 100);
             Optional.ofNullable(zSetOperations.range(RECENT, 0, end - 1))//
                 .ifPresent(tokens -> tokens.forEach(token -> {
