@@ -1,10 +1,6 @@
 package com.yukms.redis;
 
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import com.yukms.BaseRedisServiceTest;
 import com.yukms.common.util.CrossTaskRunner;
@@ -16,6 +12,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 /**
+ * 测试事务命令
+ *
  * @author yukms 2019/1/13
  */
 public class TransactionTest extends BaseRedisServiceTest {

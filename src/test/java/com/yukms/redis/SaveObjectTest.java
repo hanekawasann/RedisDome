@@ -11,6 +11,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 /**
+ * 保存对象
+ *
  * @author yukms 2019/1/10.
  */
 public class SaveObjectTest extends BaseRedisServiceTest {

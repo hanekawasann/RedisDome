@@ -18,6 +18,8 @@ import org.springframework.data.redis.core.query.SortQuery;
 import org.springframework.lang.Nullable;
 
 /**
+ * 测试排序命令
+ *
  * @author yukms 2019/1/13
  */
 public class SortTest extends BaseRedisServiceTest {

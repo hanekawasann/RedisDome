@@ -16,6 +16,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 
 /**
+ * 测试zset相关命令
+ *
  * @author yukms 2019/1/8.
  */
 public class CommandOfZsetTest extends BaseRedisServiceTest {
