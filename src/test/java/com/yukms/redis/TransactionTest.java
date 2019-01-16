@@ -2,12 +2,14 @@ package com.yukms.redis;
 
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.yukms.BaseRedisServiceTest;
+import com.yukms.common.util.CrossTaskRunner;
 import org.junit.Assert;
-import org.junit.Ignore;
+import org.junit.Before;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -21,72 +23,46 @@ public class TransactionTest extends BaseRedisServiceTest {
     private StringRedisTemplate stringRedisTemplate;
     private static final String SILENCE = "silence:";
 
-    @Test
-    public void test_multi_and_exec_no_transaction() throws InterruptedException {
-        ExecutorService service = Executors.newCachedThreadPool();
-        CyclicBarrier barrier = new CyclicBarrier(2);
-        service.submit(new StringAppend(stringRedisTemplate, "1", 0L, 200L, barrier));
-        service.submit(new StringAppend(stringRedisTemplate, "2", 200L, 0L, barrier));
-        ValueOperations<String, String> stringValueOperations = stringRedisTemplate.opsForValue();
-        Thread.sleep(300L);
-        Assert.assertEquals("1221", stringValueOperations.get(SILENCE));
+    @Before
+    public void openTransaction() {
+        stringRedisTemplate.setEnableTransactionSupport(true);
     }
 
     @Test
-    @Ignore
-    public void test_multi_and_exec_transaction() throws InterruptedException {
-        ExecutorService service = Executors.newCachedThreadPool();
-        CyclicBarrier barrier = new CyclicBarrier(2);
-        service.submit(new TransactionStringAppend(stringRedisTemplate, "1", 0L, 200L, barrier));
-        service.submit(new TransactionStringAppend(stringRedisTemplate, "2", 200L, 0L, barrier));
+    public void test_no_transaction() throws InterruptedException, ExecutionException {
         ValueOperations<String, String> stringValueOperations = stringRedisTemplate.opsForValue();
-        Thread.sleep(300L);
-        Assert.assertEquals("1122", stringValueOperations.get(SILENCE));
+        CrossTaskRunner.run(controller -> {
+            stringValueOperations.append(SILENCE, "1");
+            controller.notifyInsertAndAwaitMain();
+            stringValueOperations.append(SILENCE, "1");
+        }, () -> stringValueOperations.append(SILENCE, "2"));
+        Assert.assertEquals("121", stringValueOperations.get(SILENCE));
     }
 
-    private static class StringAppend implements Runnable {
-        protected StringRedisTemplate stringRedisTemplate;
-        private String s;
-        private long startSleepMillis;
-        private long middleSleepMillis;
-        private CyclicBarrier barrier;
-
-        public StringAppend(StringRedisTemplate stringRedisTemplate, String s, long startSleepMillis,
-            long middleSleepMillis, CyclicBarrier barrier) {
-            this.stringRedisTemplate = stringRedisTemplate;
-            this.s = s;
-            this.startSleepMillis = startSleepMillis;
-            this.middleSleepMillis = middleSleepMillis;
-            this.barrier = barrier;
-        }
-
-        @Override
-        public void run() {
-            try {
-                barrier.await();
-                Thread.sleep(startSleepMillis);
-                ValueOperations<String, String> valueOperations = stringRedisTemplate.opsForValue();
-                valueOperations.append(SILENCE, s);
-                Thread.sleep(middleSleepMillis);
-                valueOperations.append(SILENCE, s);
-            } catch (InterruptedException | BrokenBarrierException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private static class TransactionStringAppend extends StringAppend {
-
-        public TransactionStringAppend(StringRedisTemplate stringRedisTemplate, String s, long startSleepMillis,
-            long middleSleepMillis, CyclicBarrier barrier) {
-            super(stringRedisTemplate, s, startSleepMillis, middleSleepMillis, barrier);
-        }
-
-        @Override
-        public void run() {
+    @Test
+    public void test_multi_and_exec() throws InterruptedException, ExecutionException {
+        ValueOperations<String, String> stringValueOperations = stringRedisTemplate.opsForValue();
+        CrossTaskRunner.run(controller -> {
             stringRedisTemplate.multi();
-            super.run();
+            stringValueOperations.append(SILENCE, "1");
+            controller.notifyInsertAndAwaitMain();
+            stringValueOperations.append(SILENCE, "1");
             stringRedisTemplate.exec();
-        }
+        }, () -> stringValueOperations.append(SILENCE, "2"));
+        Assert.assertEquals("211", stringValueOperations.get(SILENCE));
+    }
+
+    @Test
+    public void test_watch() throws ExecutionException, InterruptedException {
+        ValueOperations<String, String> stringValueOperations = stringRedisTemplate.opsForValue();
+        CrossTaskRunner.run(controller -> {
+            stringRedisTemplate.watch(SILENCE);
+            stringRedisTemplate.multi();
+            stringValueOperations.append(SILENCE, "1");
+            controller.notifyInsertAndAwaitMain();
+            stringValueOperations.append(SILENCE, "1");
+            stringRedisTemplate.exec();
+        }, () -> stringValueOperations.append(SILENCE, "2"));
+        Assert.assertEquals("2", stringValueOperations.get(SILENCE));
     }
 }
