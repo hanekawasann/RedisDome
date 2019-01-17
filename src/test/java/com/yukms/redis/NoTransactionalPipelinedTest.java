@@ -11,7 +11,6 @@ import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.lang.Nullable;
 
 /**
  * 测试流水线功能
@@ -35,12 +34,13 @@ public class NoTransactionalPipelinedTest extends BaseRedisServiceTest {
         });
     }
 
+    /**
+     * 为啥这里不能用Lambda
+     */
     @Test
     public void test_sessionCallback_of_pipelined() {
-        AverageTimer.time("SessionCallback", OUTER_TIMES, time -> {
-            stringRedisTemplate.executePipelined(new SessionCallback<Boolean>() {
-                @Nullable
-                @Override
+        AverageTimer.time("SessionCallback", OUTER_TIMES,
+            time -> stringRedisTemplate.executePipelined(new SessionCallback<Boolean>() {
                 public Boolean execute(RedisOperations operations) throws DataAccessException {
                     ValueOperations<String, String> valueOperations = operations.opsForValue();
                     for (int i = 0; i < INSIDE_TIMES; i++) {
@@ -48,24 +48,18 @@ public class NoTransactionalPipelinedTest extends BaseRedisServiceTest {
                     }
                     return null;
                 }
-            });
-        });
+            }));
     }
 
     @Test
     public void test_redisCallback_of_pipelined() {
-        AverageTimer.time("RedisCallback", OUTER_TIMES, time -> {
-            stringRedisTemplate.executePipelined(new RedisCallback<Boolean>() {
-                @Nullable
-                @Override
-                public Boolean doInRedis(RedisConnection connection) throws DataAccessException {
-                    for (int i = 0; i < INSIDE_TIMES; i++) {
-                        connection.append((PIPELINED + time).getBytes(), "value".getBytes());
-                    }
-                    return null;
+        AverageTimer.time("RedisCallback", OUTER_TIMES,
+            time -> stringRedisTemplate.executePipelined((RedisCallback<Boolean>) connection -> {
+                for (int i = 0; i < INSIDE_TIMES; i++) {
+                    connection.append((PIPELINED + time).getBytes(), "value".getBytes());
                 }
-            });
-        });
+                return null;
+            }));
     }
 
 }

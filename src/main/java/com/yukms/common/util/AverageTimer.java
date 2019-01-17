@@ -32,16 +32,14 @@ public final class AverageTimer {
      * @param unit     单位
      */
     public static void time(String name, int times, Consumer<Integer> consumer, TemporalUnit unit) {
-        Duration duration = Duration.ZERO;
         Timer timer = Timer.start(name);
         for (int i = 1; i <= times; i++) {
-            timer.reStart();
             consumer.accept(i);
-            timer.end();
-            duration = duration.plus(timer.getDuration());
         }
+        timer.end();
+        Duration duration = timer.getDuration();
         System.out.println(
-            "The average time of the " + name + " is " + (duration.get(unit) / times) + " " + unit.toString() + ".");
+            "The average time of the " + name + " is " + duration.get(unit) / times + " " + unit.toString() + ".");
     }
 
 }
