@@ -51,7 +51,7 @@ public class TransactionTest extends BaseRedisServiceTest {
     }
 
     @Test
-    public void test_watch() throws ExecutionException, InterruptedException {
+    public void test_watch_single() throws ExecutionException, InterruptedException {
         ValueOperations<String, String> stringValueOperations = stringRedisTemplate.opsForValue();
         CrossTaskRunner.run(controller -> {
             stringRedisTemplate.watch(SILENCE);
@@ -63,4 +63,75 @@ public class TransactionTest extends BaseRedisServiceTest {
         }, () -> stringValueOperations.append(SILENCE, "2"));
         Assert.assertEquals("2", stringValueOperations.get(SILENCE));
     }
+
+    @Test
+    public void test_watch_multiple() throws ExecutionException, InterruptedException {
+        ValueOperations<String, String> stringValueOperations = stringRedisTemplate.opsForValue();
+        CrossTaskRunner.run(controller -> {
+            stringRedisTemplate.watch(SILENCE);
+            stringRedisTemplate.multi();
+            stringValueOperations.append(SILENCE, "1");
+            controller.notifyInsertAndAwaitMain();
+            stringValueOperations.append(SILENCE, "1");
+            stringRedisTemplate.exec();
+        }, () -> {
+            stringRedisTemplate.watch(SILENCE);
+            stringRedisTemplate.multi();
+            stringValueOperations.append(SILENCE, "2");
+            stringRedisTemplate.exec();
+        });
+        Assert.assertEquals("2", stringValueOperations.get(SILENCE));
+    }
+
+    @Test
+    public void test_unwatch() throws ExecutionException, InterruptedException {
+        ValueOperations<String, String> stringValueOperations = stringRedisTemplate.opsForValue();
+        CrossTaskRunner.run(controller -> {
+            stringRedisTemplate.watch(SILENCE);
+            stringRedisTemplate.unwatch();
+            controller.notifyInsertAndAwaitMain();
+            stringRedisTemplate.multi();
+            stringValueOperations.append(SILENCE, "1");
+            stringValueOperations.append(SILENCE, "1");
+            stringRedisTemplate.exec();
+        }, () -> stringValueOperations.append(SILENCE, "2"));
+        Assert.assertEquals("211", stringValueOperations.get(SILENCE));
+    }
+
+    /**
+     * 不同线程间watch与unwatch不会互相干扰，说明可能与线程绑定
+     */
+    @Test
+    public void test_unwatch_other_thread() throws ExecutionException, InterruptedException {
+        ValueOperations<String, String> stringValueOperations = stringRedisTemplate.opsForValue();
+        CrossTaskRunner.run(controller -> {
+            stringRedisTemplate.watch(SILENCE);
+            controller.notifyInsertAndAwaitMain();
+            stringRedisTemplate.multi();
+            stringValueOperations.append(SILENCE, "1");
+            stringValueOperations.append(SILENCE, "1");
+            stringRedisTemplate.exec();
+        }, () -> {
+            stringRedisTemplate.unwatch();
+            stringValueOperations.append(SILENCE, "2");
+        });
+        Assert.assertEquals("2", stringValueOperations.get(SILENCE));
+    }
+
+    @Test
+    public void test_discard() throws ExecutionException, InterruptedException {
+        ValueOperations<String, String> stringValueOperations = stringRedisTemplate.opsForValue();
+        CrossTaskRunner.run(controller -> {
+            stringRedisTemplate.watch(SILENCE);
+            stringRedisTemplate.multi();
+            stringValueOperations.append(SILENCE, "1");
+            stringRedisTemplate.discard();
+            controller.notifyInsertAndAwaitMain();
+            stringRedisTemplate.multi();
+            stringValueOperations.append(SILENCE, "1");
+            stringRedisTemplate.exec();
+        }, () -> stringValueOperations.append(SILENCE, "2"));
+        Assert.assertEquals("21", stringValueOperations.get(SILENCE));
+    }
+
 }

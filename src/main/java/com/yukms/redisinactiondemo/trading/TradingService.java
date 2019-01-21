@@ -58,9 +58,8 @@ public class TradingService {
         zSetOperations.add(MARKET, marketMember, price);
         // 从库存移除
         setOperations.remove(inventoryKey, itemId);
-        List<Object> execs = stringRedisTemplate.exec();
         // 如果被监视的包裹数据发生了变化，那么这里执行的命令为0条
-        return !CollectionUtils.isEmpty(execs);
+        return !CollectionUtils.isEmpty(stringRedisTemplate.exec());
     }
 
     /**
@@ -109,7 +108,6 @@ public class TradingService {
         SetOperations<String, String> setOperations = stringRedisTemplate.opsForSet();
         setOperations.add(buyerInventoryKey, itemId);
         zSetOperations.remove(MARKET, marketMember);
-        stringRedisTemplate.exec();
-        return true;
+        return !CollectionUtils.isEmpty(stringRedisTemplate.exec());
     }
 }
