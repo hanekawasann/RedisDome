@@ -1,4 +1,4 @@
-package com.yukms.redisinactiondemo.redis;
+package com.yukms.redisinactiondemo.redis.base;
 
 import com.yukms.redisinactiondemo.BaseRedisServiceTest;
 import com.yukms.redisinactiondemo.common.util.AverageTimer;

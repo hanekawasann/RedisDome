@@ -1,4 +1,4 @@
-package com.yukms.redisinactiondemo.redis;
+package com.yukms.redisinactiondemo.redis.zset;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -16,11 +16,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 
 /**
- * 测试zset相关命令
- *
- * @author yukms 2019/1/8.
+ * @author yukms 2019/1/22
  */
-public class CommandOfZsetTest extends BaseRedisServiceTest {
+public class RemoveRangeTest extends BaseRedisServiceTest {
+
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
@@ -113,39 +112,6 @@ public class CommandOfZsetTest extends BaseRedisServiceTest {
         }
     }
 
-    @Test
-    public void test_zincrby_of_zset() {
-        String key = "myzset";
-        String member = "member";
-        assertBeforeZincrby(key, member);
-        stringRedisTemplate.opsForZSet().incrementScore(key, member, -1);
-        assertAfterZincrby(key, member);
-    }
-
-    private void assertBeforeZincrby(String key, String member) {
-        ZSetOperations<String, String> zSetOperations = stringRedisTemplate.opsForZSet();
-        Long size = zSetOperations.size(key);
-        Assert.assertTrue(null == size || size == 0L);
-
-        Double score = zSetOperations.score(key, member);
-        Assert.assertNull(score);
-    }
-
-    private void assertAfterZincrby(String key, String member) {
-        ZSetOperations<String, String> zSetOperations = stringRedisTemplate.opsForZSet();
-        Long size = zSetOperations.size(key);
-        Assert.assertNotNull(size);
-        Assert.assertEquals(1L, size.intValue());
-
-        Set<String> members = zSetOperations.range(key, 0, 0);
-        Assert.assertNotNull(members);
-        Assert.assertEquals(member, new ArrayList<>(members).get(0));
-
-        Double score = zSetOperations.score(key, member);
-        Assert.assertNotNull(score);
-        Assert.assertEquals(-1L, score.longValue());
-    }
-
     private List<String> getUUIDs(int length) {
         List<String> uuids = new ArrayList<>();
         for (int i = 0; i < length; i++) {
@@ -153,4 +119,5 @@ public class CommandOfZsetTest extends BaseRedisServiceTest {
         }
         return uuids;
     }
+
 }

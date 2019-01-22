@@ -118,7 +118,7 @@ public class TokenCookieService {
         for (; ; ) {
             zSetOperations.removeRange(VIEWED, 0, -20001);
             zSetOperations.intersectAndStore(VIEWED, Collections.emptyList(), VIEWED, RedisZSetCommands.Aggregate.SUM,
-                RedisZSetCommands.Weights.of(0.5d));
+                RedisZSetCommands.Weights.of(0.5D));
             Thread.sleep(1000 * 60 * 5);
         }
     }

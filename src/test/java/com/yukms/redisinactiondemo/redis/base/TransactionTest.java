@@ -1,4 +1,4 @@
-package com.yukms.redisinactiondemo.redis;
+package com.yukms.redisinactiondemo.redis.base;
 
 import java.util.concurrent.ExecutionException;
 
