@@ -45,13 +45,13 @@ public class RedisLock {
      */
     public Optional<String> acquireLock(String lockName, long acquireTimeOut) {
         String key = MessageFormat.format(LOCK_KEY, lockName);
-        String value = UUID.randomUUID().toString();
+        String identifier = UUID.randomUUID().toString();
         Duration duration = Duration.ofSeconds(acquireTimeOut);
         LocalDateTime endTime = LocalDateTime.now().plus(duration);
         while (LocalDateTime.now().isBefore(endTime)) {
-            Boolean setIfAbsent = stringRedisTemplate.opsForValue().setIfAbsent(key, value);
+            Boolean setIfAbsent = stringRedisTemplate.opsForValue().setIfAbsent(key, identifier);
             if (setIfAbsent != null && setIfAbsent) {
-                return Optional.of(value);
+                return Optional.of(identifier);
             }
         }
         return Optional.empty();
@@ -76,14 +76,14 @@ public class RedisLock {
      */
     public Optional<String> acquireLockWithTimeOut(String lockName, long acquireTimeOut) {
         String key = MessageFormat.format(LOCK_KEY, lockName);
-        String value = UUID.randomUUID().toString();
+        String identifier = UUID.randomUUID().toString();
         Duration duration = Duration.ofSeconds(acquireTimeOut);
         LocalDateTime endTime = LocalDateTime.now().plus(duration);
         while (LocalDateTime.now().isBefore(endTime)) {
             ValueOperations<String, String> valueOperations = stringRedisTemplate.opsForValue();
-            Boolean setIfAbsent = valueOperations.setIfAbsent(key, value, DEFAULT_LOCK_TIMEOUT, TimeUnit.SECONDS);
+            Boolean setIfAbsent = valueOperations.setIfAbsent(key, identifier, DEFAULT_LOCK_TIMEOUT, TimeUnit.SECONDS);
             if (setIfAbsent != null && setIfAbsent) {
-                return Optional.of(value);
+                return Optional.of(identifier);
             }
             Long expireTimeout = stringRedisTemplate.getExpire(LOCK_KEY);
             if (expireTimeout != null && expireTimeout == -1) {

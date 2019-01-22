@@ -6,11 +6,15 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Collections;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.RedisZSetCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
@@ -33,6 +37,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class RedisSemaphore {
 
+    @Autowired
+    private RedisLock redisLock;
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
     private static final String SEMAPHORE_KEY = "semaphore:{0}";
@@ -115,8 +121,88 @@ public class RedisSemaphore {
         LocalDateTime now = LocalDateTime.now();
         long maxScore = now.minus(Duration.ofSeconds(timeoutSeconds)).toEpochSecond(zoneOffset);
         zSetOperations.removeRangeByScore(semaphoreKey, 0, maxScore);
-
-
+        zSetOperations.intersectAndStore(semaphoreKey, Collections.emptyList(), semaphoreOwnerKey,
+            RedisZSetCommands.Aggregate.SUM, RedisZSetCommands.Weights.of(0, 1));
+        // 对计数器执行自增操作，并获取计数器在执行自增操作之后的值
+        ValueOperations<String, String> valueOperations = stringRedisTemplate.opsForValue();
+        Long counter = valueOperations.increment(semaphoreCounterkey);
+        Objects.requireNonNull(counter);
+        // 尝试获取信号量
+        zSetOperations.add(semaphoreKey, identifier, now.toEpochSecond(zoneOffset));
+        zSetOperations.add(semaphoreOwnerKey, identifier, counter);
+        // 检查是否成功取得了信号量，注意这里是以semaphoreOwnerKey获取排名
+        Long rank = zSetOperations.rank(semaphoreOwnerKey, identifier);
+        if (rank != null && rank < limit) {
+            // 客户端成功获取了信号量
+            return Optional.of(identifier);
+        }
+        // 客户端未成功获取了信号量
+        zSetOperations.remove(semaphoreKey, identifier);
+        zSetOperations.remove(semaphoreOwnerKey, identifier);
         return Optional.empty();
     }
+
+    /**
+     * 公平信号量的释放操作需要同时从信号量拥有者有序集合以及超时有序集合里面删除当前客户端的标识符。
+     * <p/>
+     * 只从超时有序集合里面移除标识符可能会引发这样一个问题：
+     * 当一个客户端执行acquireFairSemaphore函数，对信号量拥有者有序集合进行了更新，并正准备将自己的标识符添加到超时有序
+     * 集合和信号量拥有者有序集合之际，如果有另一个客户端执行信号量释放函数，并将该客户端自己的标识符从超时有序集合中移除的话，
+     * 这将导致原本能够成功执行的信号量获取操作变为执行失败。
+     *
+     * @param semName    信号量名
+     * @param identifier 信号量标识符
+     * @return 释放成功返回true
+     */
+    public boolean releaseFairSemphore(String semName, String identifier) {
+        String semaphoreKey = MessageFormat.format(SEMAPHORE_KEY, semName);
+        String semaphoreOwnerKey = MessageFormat.format(SEMAPHORE_OWNER_KEY, semName);
+        ZSetOperations<String, String> zSetOperations = stringRedisTemplate.opsForZSet();
+        Long remove = zSetOperations.remove(semaphoreKey, identifier);
+        zSetOperations.remove(semaphoreOwnerKey, identifier);
+        // r如果信号量已经被正确地释放，那么返回1；如果信号量已经因为过期而被删除，那么返回0
+        return remove != null && remove == 1;
+    }
+
+    /**
+     * 只要客户端持有的信号量没有因为过期而被删除，该函数就可以对信号量的超时时间进行刷新。
+     * 另一方面，如果客户端持有的信号量已经因为超时而被删除，那么函数将释放信号量，并将信号量已经丢失的信息告知调用者。
+     * 在长时间使用信号量的时候，我们必须以足够频繁的频率对信号量进行刷新，防止它因为过期而丢失。
+     *
+     * @param semName    信号量名
+     * @param identifier 信号量标识符
+     * @return 释放成功返回true
+     */
+    public boolean refreshFairSemphore(String semName, String identifier) {
+        String semaphoreKey = MessageFormat.format(SEMAPHORE_KEY, semName);
+        ZSetOperations<String, String> zSetOperations = stringRedisTemplate.opsForZSet();
+        ZoneOffset zoneOffset = ZoneId.systemDefault().getRules().getOffset(Instant.now());
+        LocalDateTime now = LocalDateTime.now();
+        Boolean add = zSetOperations.add(semaphoreKey, identifier, now.toEpochSecond(zoneOffset));
+        return !(add != null && add);
+    }
+
+    /**
+     * 当两个线程A和B都在尝试获取剩余的一个信号量时，即使A首先对计数器执行了自增操作，但只要B能够抢先将自己的标识符添加到
+     * 有序集合里，并检查标识符在有序集合中的排名，那么B就可以成功地取得信号量。之后当A也将自己的标识符添加到有序集合里，
+     * 并检查标识符在有序集合中的排名时，A将“偷走”B已经取得的信号量，而B只有在尝试释放信号或者尝试刷新信号量的时候
+     * 才会察觉这一点。
+     *
+     * @param semName        信号量名称
+     * @param limit          信号量限制
+     * @param timeoutSeconds 过期时间
+     * @return 信号量的UUID标识符
+     */
+    public Optional<String> acquireFairSemaphoreWithLock(String semName, long limit, long timeoutSeconds) {
+        Optional<String> identifierOp = redisLock.acquireLock(semName, 1);
+        try {
+            if (identifierOp.isPresent()) {
+                return acquireFairSemaphore(semName, limit, timeoutSeconds);
+            }
+        } finally {
+            identifierOp.ifPresent(identifier -> redisLock.releaseLock(semName, identifier));
+        }
+        return identifierOp;
+    }
+
 }
