@@ -117,7 +117,7 @@ public class RedisLock {
                 }
                 return true;
             }
-            // 这里有必要调用unwatch吗？多次watch有危害吗？
+            // todo：这里有必要调用unwatch吗？多次watch有危害吗？
             stringRedisTemplate.unwatch();
         }
     }
