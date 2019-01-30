@@ -18,7 +18,7 @@ public class BaseRedisServiceTest {
     private RedisTemplate<String, String> redisTemplate;
 
     /**
-     * 每运行一个新的单元测试方法，都清理redis数据
+     * 每运行一个新的单元测试方法，都清理redis所有的数据库
      */
     @Before
     public void init() {
@@ -27,7 +27,7 @@ public class BaseRedisServiceTest {
 
     protected void flushDb() {
         redisTemplate.execute((RedisCallback<String>) connection -> {
-            connection.flushDb();
+            connection.flushAll();
             return "ok";
         });
     }
