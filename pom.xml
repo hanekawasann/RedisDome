@@ -8,10 +8,10 @@
         <version>2.1.1.RELEASE</version>
     </parent>
     <groupId>com.yukms</groupId>
-    <artifactId>spring-boot-dome</artifactId>
+    <artifactId>redis-dome</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>SpringBootDome</name>
-    <description>Demo project for 《Redis In Action》</description>
+    <name>RedisDemo</name>
+    <description>Demo project for Redis</description>
 
     <dependencies>
         <dependency>

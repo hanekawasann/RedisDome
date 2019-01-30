@@ -14,6 +14,8 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
 /**
+ * 聊天
+ *
  * @author yukms 2019/1/23
  */
 @Component
